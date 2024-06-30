@@ -7,6 +7,34 @@ from rapidfuzz._utils import is_none, setupPandas
 from rapidfuzz.distance import Indel_py as Indel
 from rapidfuzz.distance._initialize_py import Editop, Editops
 
+def _split_sequence(seq):
+    if isinstance(seq, (str, bytes)):
+        return seq.split()
+
+    splitted_seq = [[]]
+    for x in seq:
+        ch = x if isinstance(x, str) else chr(x)
+        if ch.isspace():
+            splitted_seq.append([])
+        else:
+            splitted_seq[-1].append(x)
+
+    return [tuple(x) for x in splitted_seq if x]
+
+
+def _join_splitted_sequence(seq_list):
+    if not seq_list:
+        return ""
+    if isinstance(next(iter(seq_list)), str):
+        return " ".join(seq_list)
+    if isinstance(next(iter(seq_list)), bytes):
+        return b" ".join(seq_list)
+
+    joined = []
+    for seq in seq_list:
+        joined += seq
+        joined += [ord(" ")]
+    return joined[:-1]
 
 def _levenshtein_maximum(s1, s2, weights):
     len1 = len(s1)
@@ -278,8 +306,10 @@ def normalized_distance(
 
     s1, s2 = conv_sequences(s1, s2)
     weights = weights or (1, 1, 1)
-    maximum = _levenshtein_maximum(s1, s2, weights)
-    dist = distance(s1, s2, weights=weights)
+    sorted_s1 = _join_splitted_sequence(sorted(_split_sequence(s1)))
+    sorted_s2 = _join_splitted_sequence(sorted(_split_sequence(s2)))
+    maximum = _levenshtein_maximum(sorted_s1, sorted_s2, weights)
+    dist = distance(sorted_s1, sorted_s2, weights=weights)
     norm_dist = dist / maximum if maximum else 0
     return norm_dist if (score_cutoff is None or norm_dist <= score_cutoff) else 1
 
